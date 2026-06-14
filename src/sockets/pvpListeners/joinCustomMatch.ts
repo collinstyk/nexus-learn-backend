@@ -32,7 +32,10 @@ export default (io: Server, socket: Socket, activeMatches: Map<string, any>) => 
         teams: mode === "COOP" ? {
           teamA: { players: [host] },
           teamB: { players: [] }
-        } : undefined
+        } : {
+          teamA: { players: [] },
+          teamB: { players: [] }
+        }
       };
 
       customLobbies.set(roomCode, lobby);
@@ -127,7 +130,10 @@ export default (io: Server, socket: Socket, activeMatches: Map<string, any>) => 
         roomCode, 
         participants, 
         lobby.subject, 
-        lobby.mode
+        lobby.mode,
+        {
+          totalQuestions: 0
+        } // Ticking Bomb
       );
     } catch (error) {
       console.error(`❌ [Start Custom Error]:`, error);

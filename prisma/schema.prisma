@@ -1,0 +1,561 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// 1. CORE USERS & AUTHENTICATION
+// ==========================================
+
+model User {
+  id   String @id @default(uuid())
+  name String
+
+  // Dual Identifier Configuration
+  email        String? @unique
+  phone        String? @unique
+  passwordHash String?
+
+  // Federated Third-Party OAuth ID Vault
+  googleId    String? @unique
+  appleId     String? @unique
+  microsoftId String? @unique
+  facebookId  String? @unique
+
+  role      UserRole @default(STUDENT)
+  xp        Int      @default(0)
+  elo       Int      @default(1000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  tutorProfile       TutorProfile?
+  matchParticipants  MatchParticipant[]
+  chatParticipants   ChatParticipant[]
+  messages           Message[]
+  posts              Post[]
+  comments           Comment[]
+  postLikes          PostLike[]
+  enrollments        Enrollment[]
+  streaks            Streak[]
+  leagueParticipants LeagueParticipant[]
+  activityLogs       ActivityLog[]
+  learningRoadmaps   LearningRoadmap[]
+  aiChatSessions     AiChatSession[]
+  battleSessions     BattlePlayer[]
+
+  @@index([elo])
+  @@index([xp])
+}
+
+enum UserRole {
+  STUDENT
+  TUTOR
+  ADMIN
+}
+
+model TutorProfile {
+  id             String      @id @default(uuid())
+  userId         String      @unique
+  status         TutorStatus @default(PENDING)
+  credentialsUrl String
+  bio            String      @db.Text
+  approvedAt     DateTime?
+  createdAt      DateTime    @default(now())
+
+  // Relations
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courses Course[]
+}
+
+enum TutorStatus {
+  PENDING
+  ACCREDITED
+  REJECTED
+}
+
+// ==========================================
+// 2. CBT QUIZ ENGINE & REAL-TIME PVP MATCHMAKING
+// ==========================================
+
+model Quiz {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  questions Question[]
+}
+
+model Question {
+  id     String  @id @default(uuid())
+  quizId String?
+  quiz   Quiz?   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  text          String   @db.Text
+  options       Json
+  correctAnswer String
+  createdAt     DateTime @default(now())
+
+  // A question can belong to a specific course, a specific topic, OR a broad subject
+  courseId String?
+  course   Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  topicId String?
+  topic   Topic?  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  subjectId String?
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+  @@index([courseId])
+  @@index([topicId])
+  @@index([subjectId])
+}
+
+model Match {
+  id        String      @id
+  status    MatchStatus @default(ACTIVE)
+  winnerId  String?
+  createdAt DateTime    @default(now()) @db.Timestamp(6)
+
+  // Relations
+  matchParticipants MatchParticipant[]
+
+  @@index([winnerId])
+}
+
+model MatchParticipant {
+  id      String @id @default(uuid())
+  matchId String
+  userId  String
+  score   Int    @default(0)
+
+  // Relations
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, userId])
+}
+
+enum MatchStatus {
+  ACTIVE
+  COMPLETED
+  FORFEITED
+}
+
+// ==========================================
+// 3. PEER-TO-PEER (P2P) COMMUNICATION
+// ==========================================
+
+model ChatRoom {
+  id        String   @id @default(uuid())
+  name      String?
+  isGroup   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  chatParticipants ChatParticipant[]
+  messages         Message[]
+}
+
+model ChatParticipant {
+  id       String   @id @default(uuid())
+  roomId   String
+  userId   String
+  role     ChatRole @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  // Relations
+  room ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  roomId    String
+  senderId  String
+  content   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  room   ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt(sort: Desc)])
+}
+
+enum ChatRole {
+  MEMBER
+  ADMIN
+}
+
+// ==========================================
+// 4. STUDY GROUP FORUMS (SOCIAL)
+// ==========================================
+
+model Post {
+  id        String   @id @default(uuid())
+  authorId  String
+  title     String
+  content   String   @db.Text
+  views     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // A post can be categorized under a broad discipline, a granular topic, or a private course board
+  subjectId String?
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  topicId String?
+  topic   Topic?  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  courseId String?
+  course   Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  // Core Relations
+  author   User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments Comment[]
+  likes    PostLike[]
+
+  @@index([subjectId])
+  @@index([topicId])
+  @@index([courseId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  postId    String
+  authorId  String
+  parentId  String?
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  // Relations
+  post          Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author        User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parentComment Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies       Comment[] @relation("CommentReplies")
+
+  @@index([postId])
+}
+
+model PostLike {
+  userId String
+  postId String
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([userId, postId])
+}
+
+//==========================================
+// 5. DIGITAL LIBRARY & COURSE MANAGEMENT
+// ==========================================
+
+model Subject {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  isApproved  Boolean @default(false)
+
+  // Relations
+  topics           Topic[]
+  posts            Post[]
+  questions        Question[]
+  learningRoadmaps LearningRoadmap[]
+  activityLogs     ActivityLog[]
+}
+
+model Topic {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+
+  // Relations
+  subjects         Subject[]
+  courses          Course[]
+  questions        Question[]
+  learningRoadmaps LearningRoadmap[]
+  posts            Post[]
+}
+
+model Course {
+  id             String   @id @default(uuid())
+  tutorProfileId String
+  title          String
+  description    String   @db.Text
+  code           String
+  isFree         Boolean  @default(true)
+  isPublished    Boolean  @default(false) // New field for pruning logic
+  price          Decimal  @default(0.00) @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+
+  // Relations
+  topics           Topic[]
+  tutor            TutorProfile      @relation(fields: [tutorProfileId], references: [id], onDelete: Cascade)
+  modules          Module[]
+  enrollments      Enrollment[]
+  aiSessions       AiChatSession[]
+  questions        Question[]
+  posts            Post[]
+  learningRoadmaps LearningRoadmap[]
+  resources        Resource[]
+
+  // A search filter for courses would typically include `isPublished: true`
+  // For example, in a `getCourses` function:
+  // prisma.course.findMany({ where: { isPublished: true, ...otherFilters } })
+}
+
+model Module {
+  id        String   @id @default(uuid())
+  courseId  String
+  title     String // e.g., "Module 1: Advanced Middleware Routing"
+  order     Int
+  createdAt DateTime @default(now())
+
+  // Relations
+  course    Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  resources Resource[]
+
+  @@index([courseId])
+  @@index([order])
+}
+
+model Resource {
+  id            String       @id @default(uuid())
+  courseId      String
+  type          ResourceType
+  title         String
+  fileUrl       String?
+  content       String?
+  isFreePreview Boolean
+  createdAt     DateTime     @default(now())
+
+  // Relations
+  course   Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module   Module? @relation(fields: [moduleId], references: [id])
+  moduleId String?
+
+  @@index([courseId])
+}
+
+model Enrollment {
+  id            String        @id @default(uuid())
+  userId        String
+  courseId      String
+  paymentStatus PaymentStatus @default(FREE)
+  enrolledAt    DateTime      @default(now())
+  expiresAt     DateTime?     // New field for subscription-based access expiration
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade) // 
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+}
+
+enum ResourceType {
+  VIDEO
+  PDF
+  TEXT_ARTICLE
+  INTERACTIVE_CODE
+  DOWNLOADABLE_ASSET
+}
+
+enum PaymentStatus {
+  FREE
+  PAID
+  PENDING
+}
+
+// ==========================================
+// 6. GAMIFICATION, ANALYTICS & AI TELEMETRY
+// ==========================================
+
+model Streak {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  currentCount   Int      @default(0)
+  longestCount   Int      @default(0)
+  lastActiveDate DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model League {
+  id        String     @id @default(uuid())
+  name      String
+  tier      LeagueTier
+  creatorId String?
+  startDate DateTime
+  endDate   DateTime
+
+  // Relations
+  participants LeagueParticipant[]
+
+  @@index([tier])
+}
+
+model LeagueParticipant {
+  id           String @id @default(uuid())
+  leagueId     String
+  userId       String
+  pointsEarned Int    @default(0)
+
+  // Relations
+  league League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([leagueId, userId])
+  @@index([pointsEarned(sort: Desc)])
+}
+
+model ActivityLog {
+  id     String @id @default(uuid())
+  userId String
+
+  activityType ActivityType
+  action       String
+
+  subjectId String?
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  metadata        String?
+  score           Int?
+  durationSeconds Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([subjectId])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model LearningRoadmap {
+  id          String   @id @default(uuid())
+  title       String
+  description String   @db.Text
+  userId      String
+  steps       Json
+  generatedAt DateTime @default(now())
+
+  // The roadmap adapts its scope based on what target the user provides
+  subjectId String?
+  subject   Subject? @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  topicId String?
+  topic   Topic?  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  courseId String?
+  course   Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([subjectId])
+  @@index([topicId])
+  @@index([courseId])
+}
+
+model AiChatSession {
+  id        String   @id @default(uuid())
+  userId    String
+  courseId  String?
+  messages  Json
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course? @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+enum LeagueTier {
+  SMALL_LOCAL
+  BIG_LOCAL
+  GLOBAL
+}
+
+enum BattleMode {
+  FLASH_CLASH
+  BATTLE_ROYALE
+  VELOCITY_ROYALE
+  SPRINT
+  BUZZER
+  PASS_THE_QUESTION
+  COOP
+}
+
+model BattleSession {
+  id        String      @id @default(uuid())
+  mode      BattleMode
+  status    MatchStatus @default(ACTIVE)
+  winnerId  String?
+  createdAt DateTime    @default(now())
+
+  players   BattlePlayer[]
+  questions BattleQuestion[]
+}
+
+model BattlePlayer {
+  id            String        @id @default(uuid())
+  sessionId     String
+  userId        String
+  score         Int           @default(0)
+  buzzedAt      DateTime?     // For Buzzer Mode synchronization
+  lockoutStatus Boolean       @default(false) // Penalty flag for wrong buzzer answers
+  teamId        String?       // Group/Team identifier for Co-op modes
+
+  session       BattleSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+}
+
+model BattleQuestion {
+  id        String   @id @default(uuid())
+  sessionId String
+  questionId String
+  timer     Int      @default(10) // Seconds allowed for this specific question
+
+  session   BattleSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  answers   BattleAnswer[]
+}
+
+model BattleAnswer {
+  id               String         @id @default(uuid())
+  battleQuestionId String
+  playerId         String
+  selectedOption   String
+  isCorrect        Boolean
+  responseTimeMs   Int            // For Velocity Rewards
+
+  question         BattleQuestion @relation(fields: [battleQuestionId], references: [id], onDelete: Cascade)
+}
+
+enum ActivityType {
+  PVP
+  CBT
+  RESOURCE_VIEW
+  FORUM_POST
+}

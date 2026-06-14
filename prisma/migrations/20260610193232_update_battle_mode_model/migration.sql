@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "BattleMode" ADD VALUE 'VELOCITY_ROYALE';

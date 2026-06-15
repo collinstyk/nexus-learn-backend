@@ -32,6 +32,9 @@ importers:
       morgan:
         specifier: ^1.11.0
         version: 1.11.0
+      node:
+        specifier: ^26.3.0
+        version: 26.3.0
       pg:
         specifier: ^8.21.0
         version: 8.21.0
@@ -854,8 +857,16 @@ packages:
     resolution: {integrity: sha512-c5Ko1fZJIJmzhFIkhRN76WTq+fC6tWnGy9CXA0fA+XygsWZmEwG8vmbkNqxMyoaa0Tin4djul49NzdVcJJcjeA==}
     engines: {node: ^18 || ^20 || >= 21}
 
+  node-bin-setup@1.1.4:
+    resolution: {integrity: sha512-vWNHOne0ZUavArqPP5LJta50+S8R261Fr5SvGul37HbEDcowvLjwdvd0ZeSr0r2lTSrPxl6okq9QUw8BFGiAxA==}
+
   node-gyp-build@4.8.4:
     resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
+    hasBin: true
+
+  node@26.3.0:
+    resolution: {integrity: sha512-OVdvZlmzBofSGXrQlH+6TqMTVo6Bo+vg/u2x9a2ZQSJ/NE/BQfHGvvm6Spybnw55rCqK2GBASbrzCpOt/8hjGQ==}
+    engines: {npm: '>=5.0.0'}
     hasBin: true
 
   object-assign@4.1.1:
@@ -1948,7 +1959,13 @@ snapshots:
 
   node-addon-api@8.8.0: {}
 
+  node-bin-setup@1.1.4: {}
+
   node-gyp-build@4.8.4: {}
+
+  node@26.3.0:
+    dependencies:
+      node-bin-setup: 1.1.4
 
   object-assign@4.1.1: {}
 

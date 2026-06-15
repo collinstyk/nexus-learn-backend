@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import prisma from "../prisma.js";
-import { ChatRole } from "@prisma/client";
+import { ChatRole } from "../generated/enums.js";
 import catchAsync from "../utils/catchAsync.js";
 import AppError from "../utils/appError.js";
 

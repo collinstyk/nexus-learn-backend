@@ -1,6 +1,6 @@
 import type { Server } from "socket.io";
 import handleRoundTimeout from "./handleRoundTimeout.js";
-// import endWholeMatch from "./endWholeMatch.js"; 
+import endWholeMatch from "./endWholeMatch.js"; 
 
 export default (io: Server, activeMatches: Map<any, any>, roomId: string) => {
   try {
@@ -29,7 +29,7 @@ export default (io: Server, activeMatches: Map<any, any>, roomId: string) => {
       console.log(`⏱️ [Global Clock] Initializing ${duration}s master timer for room: ${roomId}`);
       
       game.quizTimeout = setTimeout(() => {
-        // endWholeMatch(io, activeMatches, roomId);
+        endWholeMatch(io, activeMatches, roomId);
       }, duration * 1000);
     }
 

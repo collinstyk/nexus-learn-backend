@@ -9,7 +9,7 @@
     // See also https://aka.ms/tsconfig/module
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "target": "esnext",
+    "target": "ES2022",
     "types": ["node"],
     // For nodejs:
     // "lib": ["esnext"],
@@ -34,6 +34,7 @@
     // "noPropertyAccessFromIndexSignature": true,
 
     // Recommended Options
+    "allowJs": true,
     "strict": true,
     "jsx": "react-jsx",
     "verbatimModuleSyntax": true,
@@ -48,6 +49,7 @@
     "dist",
     "prisma" ,
     "*.config.ts",
-    "*.config.js"
+    "*.config.js",
+    "src/generated"
   ]
 }

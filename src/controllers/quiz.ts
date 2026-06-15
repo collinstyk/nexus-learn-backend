@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import prisma from "../prisma.js";
 import catchAsync from "../utils/catchAsync.js";
 import { logUserActivity } from "../utils/logger.js";
-import type { Question } from "../generated/prisma/client.js";
+import type { Question } from "../generated/client.js";
 import AppError from "../utils/appError.js";
 
 interface QuizOptionPayload {
@@ -209,7 +209,7 @@ export const submitDynamicQuizAnswers = catchAsync(async (req: Request, res: Res
 
   // 2. Perform the server-side validation grading loop
   submissions.forEach(sub => {
-    const targetQuestion = accurateQuestions.find(q => q.id === sub.questionId);
+    const targetQuestion = accurateQuestions.find((q: Question) => q.id === sub.questionId);
     if (targetQuestion) {
       const rawOptions = (targetQuestion.options as unknown as QuizOptionPayload[]) || [];
       const correctOption = rawOptions.find(opt => opt.isCorrect);

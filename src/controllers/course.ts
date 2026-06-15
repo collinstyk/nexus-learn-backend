@@ -3,7 +3,7 @@ import prisma from "../prisma.js";
 import catchAsync from "../utils/catchAsync.js";
 import AppError from "../utils/appError.js";
 import { logUserActivity } from "../utils/logger.js";
-import type { ResourceType } from "../generated/prisma/enums.js";
+import type { ResourceType } from "../generated/enums.js";
 
 /**
  * Create a course, More to add i.e Videos, Files e.t.c
@@ -94,8 +94,12 @@ export const updateCourse = catchAsync(
         new AppError("Forbidden: Only tutors can manage courses.", 403),
       );
 
+    if (!courseId) {
+      return next(new AppError("Bad Request: Course ID is required.", 400));
+    }
+
     // 2. Ownership Check
-    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    const course = await prisma.course.findUnique({ where: { id: courseId as string } });
 
     if (!course)
       return next(new AppError("Not Found: Target course missing.", 404));

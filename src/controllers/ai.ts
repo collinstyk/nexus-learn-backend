@@ -71,10 +71,10 @@ export const getAILearningRoadmap = catchAsync(async (req: Request, res: Respons
     select: { id: true, courses: { select: { id: true } } }
   });
 
-  const topicIds = associatedTopics.map((t) => t.id);
+  const topicIds = associatedTopics.map((t: any) => t.id);
   
   // B. Flatten and gather all course IDs connected to those topics
-  const courseIds = associatedTopics.flatMap((t) => t.courses.map((c) => c.id));
+  const courseIds = associatedTopics.flatMap((t: any) => t.courses.map((c: any) => c.id));
 
   // C. Fetch polymorphic activity logs across all three axes for the user
   const logs = await prisma.activityLog.findMany({

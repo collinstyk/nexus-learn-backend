@@ -1,4 +1,4 @@
-import { ActivityType } from "../generated/prisma/enums.js";
+import { ActivityType } from "../generated/enums.js";
 import prisma from "../prisma.js";
 import catchAsync from "./catchAsync.js";
 import type { Request, Response } from "express";

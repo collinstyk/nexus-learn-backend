@@ -14,14 +14,14 @@ export const createSubject = catchAsync(
       ...new Set(topicArray.map((t) => t.name).filter(Boolean)),
     ];
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Single query look-ahead to find existing topics
       const existingTopics = await tx.topic.findMany({
         where: { name: { in: uniqueInputNames } },
         select: { id: true, name: true, description: true },
       });
 
-      const existingNames = existingTopics.map((t) => t.name);
+      const existingNames = existingTopics.map((t: any) => t.name);
 
       // Filter out topics that don't exist yet so we can batch-create them
       const newTopicsToCreate = topicArray.filter(
@@ -51,7 +51,7 @@ export const createSubject = catchAsync(
           description,
           isApproved: false,
           topics: {
-            connect: allTargetTopics.map(t => ({id: t.id}))
+            connect: allTargetTopics.map((t: any) => ({id: t.id}))
           }
         },
         include: {

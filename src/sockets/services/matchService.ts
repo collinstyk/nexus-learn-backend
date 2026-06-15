@@ -1,7 +1,7 @@
 import { Server } from "socket.io";
 import prisma from "../../prisma.js";
 import type { ActiveMatchState } from "../pvpListeners/battleModeStrategies.js";
-import { MatchStatus } from "../../generated/prisma/enums.js"; // Assuming MatchStatus enum is generated
+import { MatchStatus } from "../../generated/enums.js"; // Assuming MatchStatus enum is generated
 
 /**
  * Saves the final state of a match to the database and cleans up the in-memory active match.

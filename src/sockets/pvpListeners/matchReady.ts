@@ -1,6 +1,6 @@
 import { Server, Socket } from "socket.io";
 import type { BattleMode, PlayerProfile, PresetConfig } from "../types.js";
-import type { BattleMode as PrismaBattleMode } from "../../generated/prisma/enums.js";
+import type { BattleMode as PrismaBattleMode } from "../../generated/enums.js";
 import {
   type ActiveMatchState,
   battleModeStrategies,
@@ -36,7 +36,7 @@ export default async (
 
     if (targetSubject) {
       // Gather all IDs of topics mapped under this subject umbrella
-      const associatedTopicIds = targetSubject.topics.map((t) => t.id);
+      const associatedTopicIds = targetSubject.topics.map((t: any) => t.id);
 
       // Query any question matching this subject directly OR linked to its child topics
       fetchedQuestions = await prisma.question.findMany({

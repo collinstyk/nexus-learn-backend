@@ -52,3 +52,26 @@ export const createTopic = catchAsync(async (req: Request, res: Response, next: 
     data: { topic: newTopic }
   });
 });
+
+/**
+ * DISCOVERY ENGINE: Get all available topics with their associated subjects.
+ * Accessible by all authenticated users.
+ */
+export const getAllTopics = catchAsync(async (req: Request, res: Response) => {
+  const topics = await prisma.topic.findMany({
+    include: {
+      subjects: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  return res.status(200).json({
+    status: "success",
+    data: { topics },
+  });
+});

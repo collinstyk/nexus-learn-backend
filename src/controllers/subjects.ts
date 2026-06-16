@@ -5,6 +5,10 @@ import prisma from "../prisma.js";
 
 export const createSubject = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
+    const { id: userId } = req.user as { id: string }
+
+    if (!userId) return next(new AppError("Unauthorized access!", 401))
+
     const { name, topics, description } = req.body;
 
     if (!name) return next(new AppError("Subject requires a name!", 400));

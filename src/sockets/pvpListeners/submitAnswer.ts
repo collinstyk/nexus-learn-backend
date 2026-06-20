@@ -30,8 +30,8 @@ export default (
     // Status Guard: Block multi-click exploits $ active lockout constraints
     if (
       playerState.hasAnsweredCurrent &&
-      game.mode !== "SPRINT" &&
-      game.mode !== "VELOCITY_ROYALE"
+      game.mode !== "SPRINT_1v1" &&
+      game.mode !== "SPRINT_GRAND_PRIX"
     ) {
       return socket.emit("pvp:error", {
         message: "You have already answered this question.",

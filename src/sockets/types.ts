@@ -1,4 +1,4 @@
-export type BattleMode = 'FLASH_CLASH' | 'BATTLE_ROYALE' | 'SPRINT' | 'BUZZER' | 'PASS_THE_QUESTION' | 'COOP' | 'VELOCITY_ROYALE';
+export type BattleMode = 'FLASH_CLASH' | 'BATTLE_ROYALE' | 'SPRINT_1v1' | 'BUZZER' | 'PASS_THE_QUESTION' | 'COOP' | 'SPRINT_GRAND_PRIX' | 'SPRINT_1v1';
 
 export interface PlayerProfile {
   socketId: string;
@@ -26,6 +26,7 @@ export interface PresetConfig {
   durationPerQuiz?: number;
   secondsPerQuestion?: number;
   totalQuestions: number;
+  lives?: number;
 }
 
 export interface SubmitAnswerPayload {
@@ -66,6 +67,6 @@ export interface ChatMessagePayload {
 }
 
 export interface ServerMessageBroadcast extends ChatMessagePayload {
-  id: string;        
-  createdAt: string; 
+  id: string;
+  createdAt: string;
 }

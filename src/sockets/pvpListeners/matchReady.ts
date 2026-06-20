@@ -122,6 +122,7 @@ export default async (
         hasAnsweredCurrent: false,
         currentRoundChoice: null,
         currentRoundPoints: 0,
+        lives: mode === "BATTLE_ROYALE" ? (presetConfig?.lives || 3) : undefined,
       };
       if (p.teamId) playerState[p.socketId].teamId = p.teamId; // Assign teamId if present
     });

@@ -2,6 +2,7 @@ import { Server, Socket } from "socket.io";
 import type { BattleMode } from "../types.js";
 import sendNextQuestion from "./sendNextQuestion.js";
 import { activeMatches } from "../index.js";
+import endWholeMatch from "./endWholeMatch.js";
 
 // Assuming ActiveMatchState is the type of object stored in activeMatches Map
 export interface ActiveMatchState {
@@ -29,6 +30,7 @@ export interface ActiveMatchState {
       playerQuestionIndex: number;
       currentRoundChoice: any; // Player's chosen option
       currentRoundPoints: number;
+      lives?: number;
     }
   >;
   questionTimeout: NodeJS.Timeout | null;
@@ -149,73 +151,110 @@ class BattleRoyaleStrategy implements BattleModeStrategy {
     payload: SubmitAnswerPayload,
   ): void {
     const playerState = game.players[socket.id];
-    // Similar to FlashClash, but potentially different scoring for multiple players
-    // and elimination logic.
-    if (playerState && !playerState.hasAnsweredCurrent) {
-      console.log(
-        `[BattleRoyaleStrategy] Player ${playerState?.name} submitted answer for question ${payload.questionId}`,
-      );
-      playerState.hasAnsweredCurrent = true;
-      const isCorrect = Math.random() > 0.5; // Simulate correctness
-      const points = isCorrect ? 100 : 0;
-      const velocityBonus = isCorrect && payload.responseTime < 3000 ? 50 : 0;
-      playerState.score += points + velocityBonus;
-      playerState.currentRoundPoints = points + velocityBonus;
-      playerState.currentRoundChoice = payload.answer;
 
-      io.to(game.roomId).emit("pvp:playerAnswered", {
-        userId: playerState.userId,
-        score: playerState.score,
-        isCorrect,
-        velocityBonus,
-        // ... other relevant info for UI
-      });
+    // 1. Guard: Ignore submissions if player is already eliminated or already answered
+    if (!playerState || playerState.status === "ELIMINATED" || playerState.hasAnsweredCurrent) {
+      return;
+    }
 
-      // Check if all active players have answered or if enough time has passed
-      const activePlayers = Object.values(game.players).filter(
-        (p) => p.status !== "ELIMINATED",
-      ); // Assuming a status
-      const allActiveAnswered = activePlayers.every(
-        (p) => p.hasAnsweredCurrent,
-      );
-      if (allActiveAnswered) {
-        console.log(
-          `[BattleRoyaleStrategy] All active players answered. Evaluating round.`,
-        );
-        // Implement elimination logic here
-        // For now, just reset
-        Object.values(game.players).forEach((p) => {
-          p.hasAnsweredCurrent = false;
-          p.currentRoundChoice = null;
-          p.currentRoundPoints = 0;
-        });
+    playerState.hasAnsweredCurrent = true;
+    playerState.currentRoundChoice = payload.answer;
 
-        if (game.questionTimeout) {
-          clearTimeout(game.questionTimeout);
-          game.questionTimeout = null;
+    const question = game.questions[game.currentQuestionIndex];
+    const isCorrect = question?.correctAnswer === payload.answer;
+
+    if (isCorrect) {
+      // Correct: Earn points and speed bonuses
+      const velocityBonus = payload.responseTime < 3000 ? 25 : 0;
+      playerState.score += 100 + velocityBonus;
+      playerState.currentRoundPoints = 100 + velocityBonus;
+    } else {
+      // Incorrect: Deduct a life
+      playerState.currentRoundPoints = 0;
+      if (playerState.lives !== undefined) {
+        playerState.lives -= 1;
+        if (playerState.lives <= 0) {
+          playerState.status = "ELIMINATED";
         }
-
-        game.currentQuestionIndex++;
-        sendNextQuestion(io, activeMatches, game.roomId);
       }
+    }
+
+    // Broadcast submission feedback to the room
+    io.to(game.roomId).emit("pvp:playerAnswered", {
+      userId: playerState.userId,
+      isCorrect,
+      score: playerState.score,
+      livesLeft: playerState.lives,
+      status: playerState.status,
+    });
+
+    // 2. Evaluate round once all active players submit answers
+    const activePlayers = Object.values(game.players).filter((p) => p.status === "ALIVE");
+    const allActiveAnswered = activePlayers.every((p) => p.hasAnsweredCurrent);
+
+    if (allActiveAnswered) {
+      this.evaluateSurvivalRound(io, game);
     }
   }
 
   handleRoundTimeout(io: Server, game: ActiveMatchState): void {
-    console.log(`[BattleRoyaleStrategy] Round timeout for room ${game.roomId}`);
-    // Award 0 points to players who haven't answered, potentially eliminate lowest scorers
+    // Deduct a life from any active player who did not submit an answer in time
     Object.values(game.players).forEach((playerState) => {
-      if (!playerState.hasAnsweredCurrent) {
+      if (playerState.status === "ALIVE" && !playerState.hasAnsweredCurrent) {
         playerState.currentRoundPoints = 0;
+        if (playerState.lives !== undefined) {
+          playerState.lives -= 1;
+          if (playerState.lives <= 0) {
+            playerState.status = "ELIMINATED";
+          }
+        }
         io.to(game.roomId).emit("pvp:playerNoAnswer", {
           userId: playerState.userId,
-          score: playerState.score,
+          livesLeft: playerState.lives,
+          status: playerState.status,
         });
       }
-      playerState.hasAnsweredCurrent = false;
-      playerState.currentRoundChoice = null;
     });
-    // Implement elimination logic based on scores or no-answer
+
+    this.evaluateSurvivalRound(io, game);
+  }
+
+  private evaluateSurvivalRound(io: Server, game: ActiveMatchState): void {
+    if (game.questionTimeout) {
+      clearTimeout(game.questionTimeout);
+      game.questionTimeout = null;
+    }
+
+    // Reset round flags for the next round
+    Object.values(game.players).forEach((p) => {
+      p.hasAnsweredCurrent = false;
+      p.currentRoundChoice = null;
+    });
+
+    // Check survival state
+    const survivors = Object.values(game.players).filter((p) => p.status === "ALIVE");
+
+    // 3. Early Win Check
+    if (survivors.length === 1) {
+      // Last person standing wins immediately
+      const winner = survivors[0]!;
+      io.to(game.roomId).emit("pvp:survivalVictory", {
+        winnerId: winner.userId,
+        message: `${winner.name} is the last student standing!`,
+      });
+      // Trigger match ending procedures (e.g. ELO/XP updates and cache clear)
+      endWholeMatch(io, activeMatches, game.roomId);
+      return;
+    } else if (survivors.length === 0) {
+      // Draw/Sudden Death scenario where everyone was eliminated at once
+      io.to(game.roomId).emit("pvp:survivalDraw", {
+        message: "No survivors remaining. Sudden death draw!",
+      });
+      endWholeMatch(io, activeMatches, game.roomId);
+      return;
+    }
+
+    // Proceed to next question
     game.currentQuestionIndex++;
     sendNextQuestion(io, activeMatches, game.roomId);
   }
@@ -308,15 +347,15 @@ class PassTheQuestionStrategy implements BattleModeStrategy {
     game: ActiveMatchState,
     payload: SubmitAnswerPayload,
   ): void {
-    
+
     // Implement turn-based logic, passing question on failure/timeout
     // This would involve tracking whose turn it is, and if they fail, passing to the next.
     // For simplicity, let's assume a single attempt for now.
     const playerState = game.players[socket.id];
     if (playerState) {
       console.log(
-      `[PassTheQuestionStrategy] Player ${playerState.name} submitted answer for question ${payload.questionId}`,
-    );
+        `[PassTheQuestionStrategy] Player ${playerState.name} submitted answer for question ${payload.questionId}`,
+      );
       // Assuming it's their turn
       const isCorrect = Math.random() > 0.5;
       if (isCorrect) {
@@ -442,7 +481,7 @@ class CoopStrategy implements BattleModeStrategy {
   }
 }
 
-class SprintStrategy implements BattleModeStrategy {
+class Sprint1v1Strategy implements BattleModeStrategy {
   handleSubmitAnswer(
     io: Server,
     socket: Socket,
@@ -450,13 +489,13 @@ class SprintStrategy implements BattleModeStrategy {
     payload: SubmitAnswerPayload,
   ): void | boolean {
     const playerState = game.players[socket.id];
-    
+
     if (!playerState) return;
-    
+
     console.log(
       `[SprintStrategy] Player ${playerState?.userId} submitted answer for question ${payload.questionId}`,
     );
-    
+
     const question = game.questions[playerState.playerQuestionIndex];
     if (!question || question.id !== payload.questionId) {
       return socket.emit("pvp:error", {
@@ -513,7 +552,7 @@ class SprintStrategy implements BattleModeStrategy {
   }
 }
 
-class VelocityRoyaleStrategy extends SprintStrategy {
+class SprintGrandPrixStrategy extends Sprint1v1Strategy {
   // Velocity Royale uses the Sprint independent progress logic but operates under Royale rules
 }
 
@@ -524,6 +563,6 @@ export const battleModeStrategies: Record<BattleMode, BattleModeStrategy> = {
   BUZZER: new BuzzerStrategy(),
   PASS_THE_QUESTION: new PassTheQuestionStrategy(),
   COOP: new CoopStrategy(),
-  SPRINT: new SprintStrategy(),
-  VELOCITY_ROYALE: new VelocityRoyaleStrategy(),
+  SPRINT_1v1: new Sprint1v1Strategy(),
+  SPRINT_GRAND_PRIX: new SprintGrandPrixStrategy(),
 };

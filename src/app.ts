@@ -4,6 +4,8 @@ import morgan from "morgan";
 
 import authRouter from "./routes/auth.js";
 import chatRouter from "./routes/chat.js";
+import subjectRouter from "./routes/subjects.js";
+import topicRouter from "./routes/topic.js";
 import courseRouter from "./routes/course.js";
 import enrollmentRouter from "./routes/enrollment.js";
 import forumRouter from "./routes/forum.js";
@@ -29,6 +31,8 @@ app.use(morgan("dev"));
 // routes
 app.use("/api/v1/auth", authRouter)
 app.use("/api/v1/chat", chatRouter);
+app.use("/api/v1/subjects", subjectRouter);
+app.use("/api/v1/topics", topicRouter);
 app.use("/api/v1/courses", courseRouter);
 app.use("/api/v1/enrollment", enrollmentRouter);
 app.use("/api/v1/forum", forumRouter);

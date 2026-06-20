@@ -1,6 +1,6 @@
 import type { Server } from "socket.io";
 import handleRoundTimeout from "./handleRoundTimeout.js";
-import endWholeMatch from "./endWholeMatch.js"; 
+import endWholeMatch from "./endWholeMatch.js";
 
 export default (io: Server, activeMatches: Map<any, any>, roomId: string) => {
   try {
@@ -21,13 +21,13 @@ export default (io: Server, activeMatches: Map<any, any>, roomId: string) => {
 
     if (game.questionTimeout) clearTimeout(game.questionTimeout);
 
-    const isMacroTimed = game.mode === "SPRINT" || game.mode === "VELOCITY_ROYALE";
+    const isMacroTimed = game.mode === "SPRINT_1v1" || game.mode === "SPRINT_GRAND_PRIX";
 
     // 2. Master Clock Allocation
     if (currentIndex === 0 && isMacroTimed) {
       const duration = game.presetConfig?.durationPerQuiz || 120;
       console.log(`⏱️ [Global Clock] Initializing ${duration}s master timer for room: ${roomId}`);
-      
+
       game.quizTimeout = setTimeout(() => {
         endWholeMatch(io, activeMatches, roomId);
       }, duration * 1000);

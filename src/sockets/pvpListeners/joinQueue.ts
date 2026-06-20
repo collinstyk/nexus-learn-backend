@@ -13,7 +13,7 @@ interface LiveLobby {
 }
 
 const generateQueueKey = (subject: string, mode: string, config: any): string => {
-  if (mode === "SPRINT" || mode === "VELOCITY_ROYALE") {
+  if (mode === "SPRINT_1v1" || mode === "SPRINT_GRAND_PRIX") {
     const duration = config?.durationPerQuiz || 120; // Macro quiz countdown timer (seconds)
     const questions = config?.totalQuestions || 20;
     return `${subject}:${mode}-${duration}s-${questions}q`; // eg: MATHEMATICS:SPRINT-120s-20q
@@ -56,16 +56,16 @@ const isUserEngaged = (
 };
 
 export default (
-    io: Server,
-    socket: Socket,
-    activeMatches: Map<any, any>,
-    customLobbies: Map<string, CustomLobbyState>,
-    flashClashQueues: Map<string, PlayerProfile[]>,
-    sprintQueues: Map<string, PlayerProfile[]>,
-    buzzerQueues: Map<string, PlayerProfile[]>,
-    coopQueues: Map<string, PlayerProfile[]>,
-    activeLobbies: Map<string, LiveLobby>,
-  ) =>
+  io: Server,
+  socket: Socket,
+  activeMatches: Map<any, any>,
+  customLobbies: Map<string, CustomLobbyState>,
+  flashClashQueues: Map<string, PlayerProfile[]>,
+  sprintQueues: Map<string, PlayerProfile[]>,
+  buzzerQueues: Map<string, PlayerProfile[]>,
+  coopQueues: Map<string, PlayerProfile[]>,
+  activeLobbies: Map<string, LiveLobby>,
+) =>
   (payload: any) => {
     try {
       const mode = payload?.mode || "FLASH_CLASH";
@@ -103,7 +103,7 @@ export default (
       };
 
       // --- ROUTE PATH A: INSTANT FIFO (Subject Isolated) ---
-      if (mode === "FLASH_CLASH" || mode === "SPRINT" || mode === "BUZZER") {
+      if (mode === "FLASH_CLASH" || mode === "SPRINT_1v1" || mode === "BUZZER") {
         const modeMap =
           mode === "FLASH_CLASH"
             ? flashClashQueues
@@ -115,7 +115,7 @@ export default (
         const queue = modeMap.get(queueKey)!;
         queue.push(newPlayer);
         console.log(modeMap);
-        
+
 
         if (queue.length === 2) {
           const participants = queue.splice(0, 2);
@@ -134,7 +134,7 @@ export default (
             participants,
             subject,
             mode,
-           config,
+            config,
           );
         }
 
@@ -180,7 +180,7 @@ export default (
       }
 
       // --- ROUTE PATH C: TIMER LOBBIES ---
-      if (mode === "BATTLE_ROYALE" || mode === "PASS_THE_QUESTION" || mode === "VELOCITY_ROYALE") {
+      if (mode === "BATTLE_ROYALE" || mode === "PASS_THE_QUESTION" || mode === "SPRINT_GRAND_PRIX") {
         let lobby = Array.from(activeLobbies.values()).find(
           (l) => l.configKey === queueKey,
         );
@@ -189,7 +189,7 @@ export default (
           const lobbyId = crypto.randomUUID();
           let lobbyTimeout = 60000;
           if (mode === "BATTLE_ROYALE") lobbyTimeout = 30000/*540000;*/
-          if (mode === "VELOCITY_ROYALE") lobbyTimeout = 30000/*540000;*/
+          if (mode === "SPRINT_GRAND_PRIX") lobbyTimeout = 30000/*540000;*/
           if (mode === "PASS_THE_QUESTION") lobbyTimeout = 30000/*180000;*/
 
           const duration = (config?.durationPerQuiz || 120) * 1000;
@@ -201,7 +201,7 @@ export default (
             activeLobbies.delete(lobbyId);
 
             if (
-              (finalLobbyState.mode === "PASS_THE_QUESTION" || finalLobbyState.mode === "VELOCITY_ROYALE") &&
+              (finalLobbyState.mode === "PASS_THE_QUESTION" || finalLobbyState.mode === "SPRINT_GRAND_PRIX") &&
               finalLobbyState.players.length < 2
             ) {
               finalLobbyState.players.forEach((p) => {
@@ -225,7 +225,7 @@ export default (
           }, lobbyTimeout);
 
           lobby = { lobbyId, mode, subject, configKey: queueKey, players: [], timerRef };
-          activeLobbies.set(lobbyId, lobby);          
+          activeLobbies.set(lobbyId, lobby);
         }
 
         socket.join(lobby.lobbyId);

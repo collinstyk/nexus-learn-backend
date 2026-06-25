@@ -1,5 +1,6 @@
 import express from "express";
 import type { Express } from "express";
+import cors from "cors";
 import morgan from "morgan";
 
 import authRouter from "./routes/auth.js";
@@ -15,18 +16,15 @@ import quizRouter from "./routes/quiz.js";
 
 const app: Express = express();
 
+app.use(cors({
+    origin: ["http://localhost:5173", "https://nexus-learn-frontend.vercel.app"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+}))
+
 app.use(express.json());
 
 app.use(morgan("dev"));
-
-// app.get("/", (req, res) => {
-//   res.status(200).json({
-//     message: "Connected Successfully!",
-//     data: {
-//       app: "nexus learn",
-//     },
-//   });
-// });
 
 // routes
 app.use("/api/v1/auth", authRouter)

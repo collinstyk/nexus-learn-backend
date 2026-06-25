@@ -107,7 +107,7 @@ export default (
         const modeMap =
           mode === "FLASH_CLASH"
             ? flashClashQueues
-            : mode === "SPRINT"
+            : mode === "SPRINT_1v1"
               ? sprintQueues
               : buzzerQueues;
 

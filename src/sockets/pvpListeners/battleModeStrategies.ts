@@ -347,43 +347,131 @@ class PassTheQuestionStrategy implements BattleModeStrategy {
     game: ActiveMatchState,
     payload: SubmitAnswerPayload,
   ): void {
+    // 1. Initialize Turn Holder if not already set (Assign first player at start of round)
+    const playerSocketIds = Object.keys(game.players);
+    if (!game.firstAnswerSocketId) {
+      game.firstAnswerSocketId = playerSocketIds[0] as string | null;
+    }
 
-    // Implement turn-based logic, passing question on failure/timeout
-    // This would involve tracking whose turn it is, and if they fail, passing to the next.
-    // For simplicity, let's assume a single attempt for now.
+    // 2. Guard: Strictly validate that it is this player's turn
+    if (game.firstAnswerSocketId !== socket.id) {
+      socket.emit("pvp:error", { message: "It is not your turn to act!" });
+      return;
+    }
+
     const playerState = game.players[socket.id];
-    if (playerState) {
-      console.log(
-        `[PassTheQuestionStrategy] Player ${playerState.name} submitted answer for question ${payload.questionId}`,
-      );
-      // Assuming it's their turn
-      const isCorrect = Math.random() > 0.5;
-      if (isCorrect) {
-        playerState.score += 100;
-        io.to(game.roomId).emit("pvp:playerCorrect", {
-          userId: socket.userId,
-          score: playerState.score,
-        });
-        game.currentQuestionIndex++;
-        sendNextQuestion(io, activeMatches, game.roomId);
-      } else {
-        io.to(game.roomId).emit("pvp:playerWrong", { userId: socket.userId });
-        // Logic to pass to next player
-        console.log(
-          `[PassTheQuestionStrategy] Player ${playerState.name} answered wrong. Passing question.`,
-        );
-        // This would involve updating game state to indicate next player's turn
-        // and restarting a timer for them.
-      }
+    if (!playerState || playerState.hasAnsweredCurrent) return;
+
+    playerState.hasAnsweredCurrent = true;
+    playerState.currentRoundChoice = payload.answer;
+
+    const question = game.questions[game.currentQuestionIndex];
+    const isCorrect = question?.correctAnswer === payload.answer;
+
+    if (isCorrect) {
+      // Logic: Earn standard points on success
+      playerState.score += 100;
+      playerState.currentRoundPoints = 100;
+
+      io.to(game.roomId).emit("pvp:playerCorrect", {
+        userId: socket.userId,
+        score: playerState.score,
+        message: `${playerState.name} answered correctly! +100 Points.`,
+      });
+
+      // Advance globally to a fresh new question deck
+      this.advanceToNextNewQuestion(io, game);
+    } else {
+      // Logic: Wrong answer triggers penalty and passes the question down
+      playerState.currentRoundPoints = 0;
+
+      io.to(game.roomId).emit("pvp:playerWrong", {
+        userId: socket.userId,
+        message: `${playerState.name} answered incorrectly! Passing question...`
+      });
+
+      this.passQuestionToNextPlayer(io, game);
     }
   }
 
   handleRoundTimeout(io: Server, game: ActiveMatchState): void {
-    console.log(
-      `[PassTheQuestionStrategy] Round timeout for room ${game.roomId}`,
-    );
-    // Logic to pass question to next player if current player times out
-    // If all players fail/timeout, move to next question.
+    console.log(`[PassTheQuestionStrategy] Turn timeout for room ${game.roomId}`);
+
+    // Find the player who timed out on their turn
+    if (game.firstAnswerSocketId) {
+      const activePlayer = game.players[game.firstAnswerSocketId];
+      if (activePlayer) {
+        activePlayer.currentRoundPoints = 0;
+        io.to(game.roomId).emit("pvp:playerTimeout", {
+          userId: activePlayer.userId,
+          message: `${activePlayer.name} ran out of time! Passing question...`,
+        });
+      }
+    }
+
+    // Pass the hot-potato question instead of dropping it entirely
+    this.passQuestionToNextPlayer(io, game);
+  }
+
+  /**
+   * 🔄 Shifts the active turn holder to the next sequence node index
+   */
+  private passQuestionToNextPlayer(io: Server, game: ActiveMatchState): void {
+    const playerSocketIds = Object.keys(game.players);
+    const currentIndex = playerSocketIds.indexOf(game.firstAnswerSocketId || "");
+
+    // Compute next sequential player socket index loop
+    const nextIndex = (currentIndex + 1) % playerSocketIds.length;
+    const nextPlayerSocketId = playerSocketIds[nextIndex];
+
+    // Reset loop verification state variable parameters for the single turn runner
+    Object.values(game.players).forEach((p) => {
+      p.hasAnsweredCurrent = false;
+    });
+
+    // Guard: If the question loops completely back to the original author, kill it
+    if (!game.firstAnswerSocketId || nextPlayerSocketId === playerSocketIds[0]) {
+      io.to(game.roomId).emit("pvp:questionDead", {
+        message: "Question passed through everyone. Dead round.",
+      });
+      this.advanceToNextNewQuestion(io, game);
+      return;
+    }
+
+    // Update active loop tracker pointers safely
+    game.firstAnswerSocketId = nextPlayerSocketId as string;
+    const nextPlayer = game.players[nextPlayerSocketId as string];
+
+    if (game.questionTimeout) {
+      clearTimeout(game.questionTimeout);
+      game.questionTimeout = null;
+    }
+
+    // Reset clock for the next player to have a fresh attempt at the bonus point threshold
+    game.questionStartTime = Date.now();
+
+    io.to(game.roomId).emit("pvp:turnPassed", {
+      activeUserId: nextPlayer?.userId,
+      message: `Question passed to ${nextPlayer?.name}! Can you steal?`,
+    });
+  }
+
+  /**
+   * 🧼 Completely resets turn metrics indicators to deploy a new question deck completely
+   */
+  private advanceToNextNewQuestion(io: Server, game: ActiveMatchState): void {
+    if (game.questionTimeout) {
+      clearTimeout(game.questionTimeout);
+      game.questionTimeout = null;
+    }
+
+    game.firstAnswerSocketId = null; // Clears active token loop pointer
+    Object.values(game.players).forEach((p) => {
+      p.hasAnsweredCurrent = false;
+      p.currentRoundChoice = null;
+      p.currentRoundPoints = 0;
+    });
+
     game.currentQuestionIndex++;
     sendNextQuestion(io, activeMatches, game.roomId);
   }

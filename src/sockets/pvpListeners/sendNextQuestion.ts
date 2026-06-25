@@ -60,6 +60,7 @@ export default (io: Server, activeMatches: Map<any, any>, roomId: string) => {
       totalQuestions: game.questions.length,
       question: clientQuestion,
       players: game.players,
+      presetConfig: game.presetConfig
     });
 
     console.log(`Question Pushed: Sent question index ${currentIndex} to room: ${roomId}`);

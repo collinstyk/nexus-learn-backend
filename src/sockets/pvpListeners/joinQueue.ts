@@ -187,10 +187,10 @@ export default (
 
         if (!lobby) {
           const lobbyId = crypto.randomUUID();
-          let lobbyTimeout = 60000;
-          if (mode === "BATTLE_ROYALE") lobbyTimeout = 30000/*540000;*/
-          if (mode === "SPRINT_GRAND_PRIX") lobbyTimeout = 30000/*540000;*/
-          if (mode === "PASS_THE_QUESTION") lobbyTimeout = 30000/*180000;*/
+          let lobbyTimeout = 120000;
+          if (mode === "BATTLE_ROYALE") lobbyTimeout = 120000/*540000;*/
+          if (mode === "SPRINT_GRAND_PRIX") lobbyTimeout = 120000/*540000;*/
+          if (mode === "PASS_THE_QUESTION") lobbyTimeout = 60000/*180000;*/
 
           const duration = (config?.durationPerQuiz || 120) * 1000;
 

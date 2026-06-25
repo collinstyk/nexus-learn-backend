@@ -621,6 +621,7 @@ class Sprint1v1Strategy implements BattleModeStrategy {
           text: nextQuestion.text,
           options: nextQuestion.options,
         },
+        players: game.players,
       });
     } else {
       socket.emit("pvp:raceComplete", {

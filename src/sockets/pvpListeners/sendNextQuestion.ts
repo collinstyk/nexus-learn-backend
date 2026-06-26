@@ -12,8 +12,7 @@ export default (io: Server, activeMatches: Map<any, any>, roomId: string) => {
     // 1. Authoritative Deck Exhaustion Redirect Gate
     if (currentIndex >= game.questions.length) {
       console.log(`🎴 [Deck Exhausted] Ending match ${roomId} automatically.`);
-      // return endWholeMatch(io, activeMatches, roomId);
-      return;
+      return endWholeMatch(io, activeMatches, roomId);
     }
 
     const rawQuestionData = game.questions[currentIndex];
